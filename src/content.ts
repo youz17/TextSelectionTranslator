@@ -5,10 +5,6 @@ function get_selection_rect(selection: Selection): DOMRect {
   const startNode = range.startContainer; // 起始位置的节点（文本节点或元素）
   const startOffset = range.startOffset; // 在节点内的偏移量
 
-  // 示例：获取文本节点中第一个字符的位置
-  if (startNode.nodeType !== Node.TEXT_NODE) {
-    alert("sorry, a fucking bug");
-  }
   const tempRange = document.createRange();
   tempRange.setStart(startNode, startOffset);
   tempRange.setEnd(startNode, startOffset + 1); // 选中第一个字符
@@ -32,15 +28,16 @@ function update_trans_button_position() {
 
 // 创建浮动图标元素
 const create_trans_button = () => {
-  const button = document.createElement("div");
+  const button = document.createElement("img");
+
+  button.src = chrome.runtime.getURL("res/popup_icon.svg");
   button.style.position = "fixed";
-  button.style.width = "16px";
-  button.style.height = "16px";
-  button.style.backgroundImage = `url(${chrome.runtime.getURL(
-    "res/popup_icon.png"
-  )})`;
+  button.style.width = "24px";
+  button.style.height = "24px";
   button.style.cursor = "pointer";
-  button.className = "selection-popup-icon";
+  button.style.objectFit = "contain"; // 保持比例，避免变形
+  button.style.imageRendering = "crisp-edges"; // 优化边缘锐度
+
   document.body.appendChild(button);
   button.addEventListener("click", (e) => {});
   return button;

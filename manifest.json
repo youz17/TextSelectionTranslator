@@ -2,9 +2,6 @@
   "name": "Text Selection Translator",
   "version": "1.0",
   "manifest_version": 3,
-  "background": {
-    "service_worker": "dist/background.js"
-  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
@@ -13,7 +10,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["res/popup_icon.png"],
+      "resources": ["res/popup_icon.png", "res/popup_icon.svg"],
       "matches": ["<all_urls>"]
     }
   ],
