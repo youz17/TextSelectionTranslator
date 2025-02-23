@@ -1,0 +1,26 @@
+{
+  "name": "Text Selection Translator",
+  "version": "1.0",
+  "manifest_version": 3,
+  "background": {
+    "service_worker": "dist/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["dist/content.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["res/popup_icon.png"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "icons": {
+    "16": "res/logo-16.png",
+    "32": "res/logo-32.png"
+  },
+
+  "permissions": ["activeTab", "scripting"]
+}
