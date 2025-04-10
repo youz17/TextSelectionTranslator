@@ -58,11 +58,11 @@ async function translate_with_baidu(request: Request, sender: Sender) {
   }
 }
 
-function translate_with_deepseek(request: Request, sender: Sender) {
+async function translate_with_deepseek(request: Request, sender: Sender) {
   console.log("translate with deepseek");
   const apiKey = api_key.deepseek_api_key;
   const apiUrl = "https://api.deepseek.com/v1/chat/completions";
-  fetch(apiUrl, {
+  const response = await fetch(apiUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -79,15 +79,13 @@ function translate_with_deepseek(request: Request, sender: Sender) {
       ],
       temperature: 0.3,
     }),
-  })
-    .then((response) => response.json())
-    .then((data) => {
-      const translatedText = data.choices[0].message.content;
-      response_translate(translatedText, sender);
-    });
+  });
+  const data = await response.json();
+  const translatedText = data.choices[0].message.content;
+  response_translate(translatedText, sender);
 }
 
-async function translate_with_youdao(request: any, sender: Sender) {
+async function translate_with_youdao(request: Request, sender: Sender) {
   console.log("translate with youdao");
   function truncate(q: string) {
     var len = q.length;
