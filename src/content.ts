@@ -1,3 +1,5 @@
+import { popup_trans_panel } from "./trans_panel";
+
 let g_trans_button: null | HTMLDivElement = null;
 
 function get_selection_rect(selection: Selection): DOMRect {
@@ -39,7 +41,12 @@ const create_trans_button = () => {
   button.style.imageRendering = "crisp-edges"; // 优化边缘锐度
 
   document.body.appendChild(button);
-  button.addEventListener("click", (e) => {});
+  button.addEventListener("click", (e) => {
+    const selection = window.getSelection();
+    if (!selection) return;
+    e.stopPropagation();
+    popup_trans_panel(e.pageX, e.pageY, selection.toString().trim());
+  });
   return button;
 };
 

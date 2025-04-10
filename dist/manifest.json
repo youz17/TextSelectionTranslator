@@ -5,9 +5,10 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["dist/content.js"]
+      "js": ["content.js"]
     }
   ],
+  "background": { "service_worker": "service.js" },
   "web_accessible_resources": [
     {
       "resources": ["res/popup_icon.png", "res/popup_icon.svg"],

@@ -1,2 +1,5 @@
-/dist
+/dist/*
+!/dist/res/
+!/dist/manifest.json
 /node_modules
+/src/api_key.ts
