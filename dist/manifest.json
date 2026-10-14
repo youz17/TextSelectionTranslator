@@ -5,10 +5,15 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"]
+      "js": ["content.js"],
+      "all_frames": true
     }
   ],
   "background": { "service_worker": "service.js" },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
   "web_accessible_resources": [
     {
       "resources": ["res/popup_icon.png", "res/popup_icon.svg"],
@@ -20,5 +25,9 @@
     "32": "res/logo-32.png"
   },
 
-  "permissions": ["activeTab", "scripting"]
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://translate.googleapis.com/*",
+    "https://api.deepseek.com/*"
+  ]
 }

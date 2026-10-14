@@ -1,74 +1,174 @@
-import { popup_trans_panel } from "./trans_panel";
+import { get_shadow_root } from "./dom";
+import { load_settings } from "./settings";
+import {
+  is_panel_open,
+  open_trans_panel,
+  set_panel_error,
+  set_panel_loading,
+  set_panel_result,
+} from "./trans_panel";
+import { TranslateReply, TranslateSource } from "./types";
 
-let g_trans_button: null | HTMLDivElement = null;
+const BUTTON_SIZE = 32;
+const BUTTON_GAP = 6;
 
-function get_selection_rect(selection: Selection): DOMRect {
+let g_button: HTMLButtonElement | null = null;
+// 按钮出现时就把选中的文本记下来：点到按钮时选区往往已经被点没了。
+let g_selection_text = "";
+let g_request_id = 0;
+
+// 选区可能在页面自己的 shadow root 里，getClientRects 返回的仍是视口坐标，可以直接用。
+function get_selection_rect(): DOMRect | null {
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+    return null;
+  }
+
   const range = selection.getRangeAt(0);
-  const startNode = range.startContainer; // 起始位置的节点（文本节点或元素）
-  const startOffset = range.startOffset; // 在节点内的偏移量
-
-  const tempRange = document.createRange();
-  tempRange.setStart(startNode, startOffset);
-  tempRange.setEnd(startNode, startOffset + 1); // 选中第一个字符
-  const rect = tempRange.getBoundingClientRect();
+  const rects = range.getClientRects();
+  // 取最后一个矩形：多行选中时它最靠近用户松开鼠标的位置。
+  const rect =
+    rects.length > 0 ? rects[rects.length - 1] : range.getBoundingClientRect();
+  if (rect.width === 0 && rect.height === 0) return null;
   return rect;
 }
 
-function update_trans_button_position() {
-  if (g_trans_button === null) return;
-  const selection = window.getSelection()!;
-  // 获取选中区域位置
-  const rect = get_selection_rect(selection);
+function create_button(): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "tst-button";
+  button.title = "翻译选中文本";
 
-  // 创建/更新图标位置
-  const x = rect.left;
-  const y = rect.top - 30;
-  console.info("button new pos: " + x + ", " + y);
-  g_trans_button.style.left = `${x}px`;
-  g_trans_button.style.top = `${y}px`;
+  const icon = document.createElement("img");
+  icon.src = chrome.runtime.getURL("res/popup_icon.svg");
+  icon.alt = "译";
+  // 页面 CSP 可能拦掉扩展图片，退化成文字按钮。
+  icon.addEventListener("error", () => {
+    icon.remove();
+    const text = document.createElement("span");
+    text.className = "tst-button-text";
+    text.textContent = "译";
+    button.appendChild(text);
+  });
+  button.appendChild(icon);
+
+  // 用 mousedown 而不是 click：点按钮会让页面选区 collapse，
+  // 从而触发 selectionchange 把按钮移除，click 就永远等不到了。
+  button.addEventListener("mousedown", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void open_panel_for_selection(event.clientX, event.clientY);
+  });
+
+  get_shadow_root().appendChild(button);
+  return button;
 }
 
-// 创建浮动图标元素
-const create_trans_button = () => {
-  const button = document.createElement("img");
+function hide_button() {
+  g_button?.remove();
+  g_button = null;
+}
 
-  button.src = chrome.runtime.getURL("res/popup_icon.svg");
-  button.style.position = "fixed";
-  button.style.width = "24px";
-  button.style.height = "24px";
-  button.style.cursor = "pointer";
-  button.style.objectFit = "contain"; // 保持比例，避免变形
-  button.style.imageRendering = "crisp-edges"; // 优化边缘锐度
+function position_button() {
+  if (g_button === null) return;
+  const rect = get_selection_rect();
+  if (!rect) return;
 
-  document.body.appendChild(button);
-  button.addEventListener("click", (e) => {
-    const selection = window.getSelection();
-    if (!selection) return;
-    e.stopPropagation();
-    popup_trans_panel(e.pageX, e.pageY, selection.toString().trim());
-  });
-  return button;
-};
+  let left = rect.left;
+  let top = rect.top - BUTTON_SIZE - BUTTON_GAP;
+  if (top < 0) top = rect.bottom + BUTTON_GAP; // 选区贴顶时翻到下方
+  left = Math.min(Math.max(left, 0), window.innerWidth - BUTTON_SIZE);
+  top = Math.min(Math.max(top, 0), window.innerHeight - BUTTON_SIZE);
 
-// 监听文本选择变化
-document.addEventListener("selectionchange", () => {
-  const selection = window.getSelection();
+  g_button.style.left = `${left}px`;
+  g_button.style.top = `${top}px`;
+}
 
-  if (!selection || selection.isCollapsed) {
-    // 没有选中内容时移除图标
-    if (g_trans_button !== null) {
-      g_trans_button.remove();
-      g_trans_button = null;
-    }
+function update_button() {
+  // 面板开着的时候不再显示浮动按钮。
+  if (is_panel_open()) {
+    hide_button();
     return;
   }
 
-  if (g_trans_button === null) g_trans_button = create_trans_button();
+  const selection = window.getSelection();
+  const text =
+    selection && !selection.isCollapsed ? selection.toString().trim() : "";
+  if (text === "" || get_selection_rect() === null) {
+    hide_button();
+    return;
+  }
 
-  console.log("update");
-  update_trans_button_position();
+  g_selection_text = text;
+  if (g_button === null) g_button = create_button();
+  position_button();
+}
+
+function request_translation(text: string, source: TranslateSource) {
+  g_request_id += 1;
+  const request_id = g_request_id;
+  set_panel_loading(source);
+
+  try {
+    chrome.runtime
+      .sendMessage({ action: "translate", text, source, requestId: request_id })
+      .catch(() => {
+        // background 用 chrome.tabs.sendMessage 回推结果，这个 promise 不需要有响应。
+      });
+  } catch {
+    // 扩展重新加载后，旧页面里的 content script 会失效。
+    set_panel_error("扩展已更新，请刷新页面后重试", source);
+  }
+}
+
+async function open_panel_for_selection(x: number, y: number) {
+  const text = g_selection_text.trim();
+  if (text === "") return;
+
+  // 先读设置：面板一打开就该显示正确的翻译源和图钉状态，否则会闪一下。
+  const settings = await load_settings();
+
+  // 读设置是异步的，这期间 mouseup 可能又把浮动按钮建了回来，这里再清一次。
+  hide_button();
+  open_trans_panel(
+    x,
+    y,
+    { source: settings.source, pinned: settings.pin },
+    {
+      on_source_change: (source) => {
+        // 记住用户的选择，后续划词直接用这个源。
+        chrome.runtime
+          .sendMessage({ action: "set_source", source })
+          .catch(() => {});
+        request_translation(text, source);
+      },
+    }
+  );
+  request_translation(text, settings.source);
+}
+
+// 只注册一次监听，按 requestId 丢弃过期响应（原来每次弹窗都加一个监听，会越积越多）。
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.action !== "translation") return;
+  if (!is_panel_open() || message.requestId !== g_request_id) return;
+
+  const reply = message as TranslateReply;
+  if (reply.ok) {
+    set_panel_result(reply, reply.cached === true);
+  } else {
+    set_panel_error(reply.error || "翻译失败", reply.source);
+  }
 });
 
-document.addEventListener("scroll", () => {
-  if (g_trans_button) update_trans_button_position();
-});
+document.addEventListener("selectionchange", update_button);
+// shadow root 内的选区不一定触发 document 的 selectionchange，鼠标松开时兜一次。
+document.addEventListener("mouseup", update_button);
+
+// 用捕获阶段，才能收到页面内部滚动容器（不只是 window）的滚动事件。
+document.addEventListener(
+  "scroll",
+  () => {
+    if (g_button !== null) position_button();
+  },
+  true
+);

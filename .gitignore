@@ -1,5 +1,6 @@
 /dist/*
 !/dist/res/
 !/dist/manifest.json
+!/dist/options.html
 /node_modules
 /src/api_key.ts
