@@ -166,7 +166,7 @@ export function set_panel_error(message: string, source: TranslateSource) {
   clamp_into_view();
 }
 
-export function close_trans_panel() {
+function close_trans_panel() {
   document.removeEventListener("mousedown", on_document_mousedown);
   if (g_container !== null) {
     remove_panel_from(g_container);

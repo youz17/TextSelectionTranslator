@@ -215,7 +215,7 @@ function render_block(
   }
 }
 
-export function Panel(props: PanelProps) {
+function Panel(props: PanelProps) {
   const [menu_open, set_menu_open] = useState(false);
   const [copied, set_copied] = useState(false);
   const dropdown_ref = useRef<HTMLDivElement | null>(null);

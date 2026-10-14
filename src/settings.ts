@@ -1,6 +1,6 @@
 import { TranslateSource } from "./types";
 
-export interface LanguageOption {
+interface LanguageOption {
   code: string;
   label: string;
   prompt: string;
@@ -33,11 +33,11 @@ const DEFAULTS: Settings = {
   deepseek_key: "",
 };
 
-export function is_translate_source(value: unknown): value is TranslateSource {
+function is_translate_source(value: unknown): value is TranslateSource {
   return value === "google" || value === "deepseek";
 }
 
-export function is_target_language(value: unknown): value is string {
+function is_target_language(value: unknown): value is string {
   return (
     typeof value === "string" &&
     TARGET_LANGUAGES.some((item) => item.code === value)
